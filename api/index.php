@@ -1,82 +1,145 @@
 <?php
 
-use Illuminate\Http\Request;
+// Laravel Vercel Serverless Entry Point
+
+$basePath = dirname(__DIR__);
 
 /*
 |--------------------------------------------------------------------------
-| Vercel Serverless Entry Point
+| Temporary Storage
 |--------------------------------------------------------------------------
-|
-| File ini menjadi entry point Laravel ketika dijalankan melalui Vercel.
-|
 */
 
-// ---------------------------------------------------------
-// 1. Buat folder storage yang bisa ditulis di environment Vercel
-// ---------------------------------------------------------
+$tmpStorage = '/tmp/storage';
 
-$storageDirs = [
-    '/tmp/storage/app',
-    '/tmp/storage/app/public',
-    '/tmp/storage/framework',
-    '/tmp/storage/framework/cache',
-    '/tmp/storage/framework/cache/data',
-    '/tmp/storage/framework/sessions',
-    '/tmp/storage/framework/testing',
-    '/tmp/storage/framework/views',
-    '/tmp/storage/logs',
-    '/tmp/storage/bootstrap',
-    '/tmp/storage/bootstrap/cache',
+$dirs = [
+    $tmpStorage,
+    $tmpStorage . '/app',
+    $tmpStorage . '/app/public',
+    $tmpStorage . '/framework',
+    $tmpStorage . '/framework/cache',
+    $tmpStorage . '/framework/cache/data',
+    $tmpStorage . '/framework/sessions',
+    $tmpStorage . '/framework/views',
+    $tmpStorage . '/framework/testing',
+    $tmpStorage . '/logs',
 ];
 
-foreach ($storageDirs as $dir) {
+foreach ($dirs as $dir) {
     if (!is_dir($dir)) {
-        @mkdir($dir, 0755, true);
+        @mkdir($dir, 0775, true);
     }
 }
 
-// ---------------------------------------------------------
-// 2. Atur environment Laravel untuk Vercel
-// ---------------------------------------------------------
+/*
+|--------------------------------------------------------------------------
+| Environment untuk Vercel
+|--------------------------------------------------------------------------
+*/
 
-putenv('APP_ENV=production');
-$_ENV['APP_ENV'] = 'production';
-$_SERVER['APP_ENV'] = 'production';
+function set_serverless_env($key, $value)
+{
+    putenv("{$key}={$value}");
+    $_ENV[$key] = $value;
+    $_SERVER[$key] = $value;
+}
 
-putenv('APP_DEBUG=false');
-$_ENV['APP_DEBUG'] = 'false';
-$_SERVER['APP_DEBUG'] = 'false';
+set_serverless_env(
+    'APP_ENV',
+    getenv('APP_ENV') ?: 'production'
+);
 
-putenv('APP_STORAGE=/tmp/storage');
-$_ENV['APP_STORAGE'] = '/tmp/storage';
-$_SERVER['APP_STORAGE'] = '/tmp/storage';
+set_serverless_env(
+    'APP_DEBUG',
+    getenv('APP_DEBUG') ?: 'false'
+);
 
-// ---------------------------------------------------------
-// 3. Pastikan Laravel menggunakan session array
-// ---------------------------------------------------------
+set_serverless_env(
+    'LOG_CHANNEL',
+    getenv('LOG_CHANNEL') ?: 'stderr'
+);
 
-putenv('SESSION_DRIVER=array');
-$_ENV['SESSION_DRIVER'] = 'array';
-$_SERVER['SESSION_DRIVER'] = 'array';
+set_serverless_env(
+    'CACHE_STORE',
+    getenv('CACHE_STORE') ?: 'array'
+);
 
-// ---------------------------------------------------------
-// 4. Arahkan cache Laravel ke folder /tmp
-// ---------------------------------------------------------
+set_serverless_env(
+    'SESSION_DRIVER',
+    getenv('SESSION_DRIVER') ?: 'array'
+);
 
-putenv('VIEW_COMPILED_PATH=/tmp/storage/framework/views');
-$_ENV['VIEW_COMPILED_PATH'] = '/tmp/storage/framework/views';
-$_SERVER['VIEW_COMPILED_PATH'] = '/tmp/storage/framework/views';
+set_serverless_env(
+    'QUEUE_CONNECTION',
+    getenv('QUEUE_CONNECTION') ?: 'sync'
+);
 
-// ---------------------------------------------------------
-// 5. Load Laravel
-// ---------------------------------------------------------
+/*
+|--------------------------------------------------------------------------
+| Laravel Cache
+|--------------------------------------------------------------------------
+*/
 
-$app = require __DIR__ . '/../bootstrap/app.php';
+set_serverless_env(
+    'APP_CONFIG_CACHE',
+    '/tmp/config.php'
+);
 
-// ---------------------------------------------------------
-// 6. Jalankan request
-// ---------------------------------------------------------
+set_serverless_env(
+    'APP_EVENTS_CACHE',
+    '/tmp/events.php'
+);
 
-$request = Request::capture();
+set_serverless_env(
+    'APP_PACKAGES_CACHE',
+    '/tmp/packages.php'
+);
 
-$app->handleRequest($request);
+set_serverless_env(
+    'APP_ROUTES_CACHE',
+    '/tmp/routes.php'
+);
+
+set_serverless_env(
+    'APP_SERVICES_CACHE',
+    '/tmp/services.php'
+);
+
+set_serverless_env(
+    'VIEW_COMPILED_PATH',
+    $tmpStorage . '/framework/views'
+);
+
+/*
+|--------------------------------------------------------------------------
+| Composer Autoload
+|--------------------------------------------------------------------------
+*/
+
+require $basePath . '/vendor/autoload.php';
+
+/*
+|--------------------------------------------------------------------------
+| Bootstrap Laravel
+|--------------------------------------------------------------------------
+*/
+
+$app = require_once $basePath . '/bootstrap/app.php';
+
+/*
+|--------------------------------------------------------------------------
+| Gunakan Storage /tmp
+|--------------------------------------------------------------------------
+*/
+
+$app->useStoragePath($tmpStorage);
+
+/*
+|--------------------------------------------------------------------------
+| Jalankan Laravel
+|--------------------------------------------------------------------------
+*/
+
+$app->handleRequest(
+    \Illuminate\Http\Request::capture()
+);
